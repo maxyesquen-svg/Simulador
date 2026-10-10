@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Simulador de Alertas de Proximidad Minera</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #f4f6f8;
+    --panel: #ffffff;
+    --text: #1b2430;
+    --text-dim: #5a6472;
+    --border: #dfe3e8;
+    --accent: #5b7f9c;
+    --safe: #5b8c6e;
+    --warn: #c9a15c;
+    --danger: #c17b74;
+    --glass-bg: rgba(255,255,255,0.35);
+    --glass-border: rgba(255,255,255,0.5);
+    --glass-btn-bg: rgba(255,255,255,0.45);
+    --glass-btn-border: rgba(255,255,255,0.55);
+    --stat-bg: #f5f1ea;
+    --blob-opacity: 1;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #12161c; --panel: #1b212a; --text: #e8ecf1; --text-dim: #9aa4b2;
+      --border: #2b323c; --accent: #6fa3d8; --safe: #4caf7d; --warn: #e0ab3f; --danger: #e0726f;
+      --glass-bg: rgba(27,33,42,0.55); --glass-border: rgba(255,255,255,0.08);
+      --glass-btn-bg: rgba(27,33,42,0.6); --glass-btn-border: rgba(255,255,255,0.12);
+      --stat-bg: var(--bg);
+      --blob-opacity: 1;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12161c; --panel: #1b212a; --text: #e8ecf1; --text-dim: #9aa4b2;
+    --border: #2b323c; --accent: #6fa3d8; --safe: #4caf7d; --warn: #e0ab3f; --danger: #e0726f;
+    --glass-bg: rgba(27,33,42,0.55); --glass-border: rgba(255,255,255,0.08);
+    --glass-btn-bg: rgba(27,33,42,0.6); --glass-btn-border: rgba(255,255,255,0.12);
+    --stat-bg: var(--bg);
+    --blob-opacity: 1;
+  }
+  :root[data-theme="light"] {
+    --glass-bg: rgba(255,255,255,0.35); --glass-border: rgba(255,255,255,0.5);
+    --glass-btn-bg: rgba(255,255,255,0.45); --glass-btn-border: rgba(255,255,255,0.55);
+    --stat-bg: #f5f1ea;
+    --blob-opacity: 1;
+  }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); position: relative; overflow-x: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; min-height: 100%;
+    transition: background 0.25s ease, color 0.25s ease; }
+  body::before {
+    content: ""; position: fixed; inset: 0; z-index: -1; background: var(--bg); opacity: var(--blob-opacity);
+    transition: background 0.25s ease, opacity 0.25s ease;
+    background-image:
+      radial-gradient(circle at 12% 18%, rgba(255,99,99,0.30), transparent 42%),
+      radial-gradient(circle at 88% 12%, rgba(255,209,84,0.32), transparent 42%),
+      radial-gradient(circle at 15% 85%, rgba(90,190,255,0.30), transparent 42%),
+      radial-gradient(circle at 85% 88%, rgba(96,214,140,0.30), transparent 42%),
+      radial-gradient(circle at 50% 50%, rgba(120,205,255,0.22), transparent 48%);
+    background-repeat: no-repeat;
+    background-size: 160% 160%;
+    filter: blur(18px) saturate(115%);
+    animation: bgFloat 7s ease-in-out infinite alternate;
+  }
+  @keyframes bgFloat {
+    0%   { background-position: 0% 20%, 100% 0%, 10% 100%, 100% 100%, 50% 50%; }
+    25%  { background-position: 60% 70%, 30% 60%, 70% 30%, 30% 20%, 20% 80%; }
+    50%  { background-position: 30% 60%, 70% 30%, 40% 70%, 60% 40%, 65% 35%; }
+    75%  { background-position: 80% 30%, 20% 90%, 90% 10%, 10% 60%, 55% 15%; }
+    100% { background-position: 90% 10%, 10% 80%, 80% 20%, 20% 90%, 35% 65%; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    body::before { animation: none; }
+  }
+  header {
+    padding: 18px 20px 10px;
+    text-align: center;
+    margin: 14px 16px 4px;
+    position: relative;
+    background: var(--glass-bg);
+    backdrop-filter: blur(14px) saturate(160%);
+    -webkit-backdrop-filter: blur(14px) saturate(160%);
+    border: 1px solid var(--glass-border);
+    border-radius: 18px;
+    box-shadow: 0 8px 24px rgba(31,38,135,0.12), inset 0 1px 0 rgba(255,255,255,0.6);
+    transition: background 0.25s ease, border-color 0.25s ease;
+  }
+  #themeToggle {
+    position: absolute; top: 12px; right: 14px; flex: none; width: 40px; height: 40px; padding: 0;
+    display: flex; align-items: center; justify-content: center; font-size: 1.1rem;
+    background: var(--glass-btn-bg);
+    backdrop-filter: blur(10px) saturate(160%);
+    -webkit-backdrop-filter: blur(10px) saturate(160%);
+    border: 1px solid var(--glass-btn-border);
+    border-radius: 50%;
+    box-shadow: 0 4px 14px rgba(31,38,135,0.14), inset 0 1px 0 rgba(255,255,255,0.6);
+    color: var(--text);
+    transition: background 0.25s ease, border-color 0.25s ease;
+  }
+  #themeToggle:active { opacity: 0.7; }
+  header h1 { font-size: 1.2rem; margin: 0 0 4px; }
+  header p { margin: 0; color: var(--text-dim); font-size: 0.82rem; }
+  .layout { display: flex; flex-wrap: wrap; gap: 16px; padding: 12px 16px 32px; max-width: 1300px; margin: 0 auto; }
+  .col-main { flex: 2 1 480px; min-width: 300px; display: flex; flex-direction: column; gap: 16px; }
+  .col-side { flex: 1 1 320px; min-width: 280px; display: flex; flex-direction: column; gap: 16px; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 16px; }
+  .panel h2 { font-size: 0.9rem; margin: 0 0 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.03em; }
+  canvas#scene { width: 100%; height: auto; display: block; border-radius: 10px; }
+  .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; }
+  .control { display: flex; flex-direction: column; gap: 4px; }
+  .control.full { grid-column: 1 / -1; }
+  .control label { font-size: 0.78rem; color: var(--text-dim); display: flex; justify-content: space-between; }
+  .control input[type="range"] { width: 100%; accent-color: var(--accent); }
+  .control select { width: 100%; padding: 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 0.9rem; }
+  .btn-row { display: flex; gap: 10px; margin-top: 4px; }
+  button { flex: 1; padding: 10px 14px; border-radius: 10px; border: none; font-size: 0.88rem; font-weight: 600; cursor: pointer; background: var(--accent); color: white; }
+  button:active { opacity: 0.75; }
+  button.secondary { background: transparent; color: var(--text); border: 1px solid var(--border); }
+  .status { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 4px; }
+  .stat { background: var(--stat-bg); border: 1px solid var(--border); border-radius: 10px; padding: 9px 12px; }
+  .stat .k { font-size: 0.7rem; color: var(--text-dim); display: block; }
+  .stat .v { font-size: 1rem; font-weight: 700; }
+  .alert-banner { grid-column: 1 / -1; text-align: center; padding: 11px; border-radius: 10px; font-weight: 700; font-size: 0.95rem; }
+  .alert-safe { background: color-mix(in srgb, var(--safe) 18%, transparent); color: var(--safe); }
+  .alert-warn { background: color-mix(in srgb, var(--warn) 20%, transparent); color: var(--warn); }
+  .alert-danger { background: color-mix(in srgb, var(--danger) 22%, transparent); color: var(--danger); }
+  .formula { font-size: 0.8rem; color: var(--text-dim); line-height: 1.6; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-top: 8px; }
+  .formula code { color: var(--text); font-weight: 600; }
+  .chart-wrap { position: relative; height: 190px; }
+  .state-bars { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+  .state-bar-row { display: flex; align-items: center; gap: 8px; font-size: 0.78rem; }
+  .state-bar-row .label { width: 60px; color: var(--text-dim); }
+  .state-bar-row .track { flex: 1; height: 10px; background: var(--bg); border-radius: 6px; overflow: hidden; border: 1px solid var(--border); }
+  .state-bar-row .fill { height: 100%; transition: width 0.2s; }
+  .state-bar-row .pct { width: 40px; text-align: right; font-weight: 600; }
+  footer { text-align: center; color: var(--text-dim); font-size: 0.72rem; padding: 10px 16px 24px; }
+</style>
+</head>
+<body>
+
+<header>
+  <button id="themeToggle" type="button" title="Cambiar tema" aria-label="Cambiar tema claro/oscuro">🌙</button>
+  <h1>🛰️ Simulador de Alertas de Proximidad Minera</h1>
+  <p>Varios operarios en movimiento · frenado activado a distancia prudente (equivalente a la versión Python)</p>
+</header>
+
+<div class="layout">
+
+  <div class="col-main">
+    <div class="panel">
+      <h2>Escenario</h2>
+      <canvas id="scene" width="900" height="360"></canvas>
+      <div class="status">
+        <div class="stat"><span class="k">Velocidad actual</span><span class="v" id="statVel">—</span></div>
+        <div class="stat"><span class="k">Distancia al operario más cercano</span><span class="v" id="statDist">—</span></div>
+        <div class="stat"><span class="k">Umbral de frenado (con margen)</span><span class="v" id="statBrake">—</span></div>
+        <div class="stat"><span class="k">Fuerza de fricción disponible</span><span class="v" id="statFf">—</span></div>
+        <div class="alert-banner alert-safe" id="alertBanner">Presiona "Iniciar" para simular</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Parámetros</h2>
+      <div class="controls">
+        <div class="control full">
+          <label>Velocidad de crucero <span id="lblVel">25 km/h</span></label>
+          <input type="range" id="velocidad" min="5" max="45" value="25" step="1">
+        </div>
+        <div class="control">
+          <label>Tipo de vehículo</label>
+          <select id="masa">
+            <option value="1500">Liviano (1 500 kg)</option>
+            <option value="8000" selected>Camión pesado (8 000 kg)</option>
+            <option value="25000">Camión minero (25 000 kg)</option>
+          </select>
+        </div>
+        <div class="control">
+          <label>Condición del terreno</label>
+          <select id="terreno">
+            <option value="0.7" selected>Seco (μ = 0.7)</option>
+            <option value="0.4">Húmedo (μ = 0.4)</option>
+            <option value="0.25">Material suelto (μ = 0.25)</option>
+          </select>
+        </div>
+        <div class="control">
+          <label>N.º de operarios</label>
+          <select id="numOperarios">
+            <option value="2">2</option>
+            <option value="4" selected>4</option>
+            <option value="6">6</option>
+          </select>
+        </div>
+        <div class="control">
+          <label>Margen de seguridad <span id="lblMargen">1.25×</span></label>
+          <input type="range" id="margen" min="1.0" max="1.6" value="1.25" step="0.05">
+        </div>
+      </div>
+      <div class="btn-row">
+        <button id="btnStart">▶ Iniciar simulación</button>
+        <button id="btnReset" class="secondary">⟲ Reiniciar</button>
+      </div>
+      <div class="formula">
+        <div><code>d</code> = √[(x₂−x₁)² + (y₂−y₁)²] — distancia euclidiana al operario más cercano</div>
+        <div><code>Ff</code> = μ · m · g — fuerza de fricción</div>
+        <div><code>dfrenado</code> = (v² / (2·μ·g) + v·treacción) × margen — umbral de alerta</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-side">
+    <div class="panel">
+      <h2>Curva teórica: frenado vs. velocidad</h2>
+      <div class="chart-wrap"><canvas id="chartCurve"></canvas></div>
+    </div>
+    <div class="panel">
+      <h2>Distancia mínima vs. tiempo (en vivo)</h2>
+      <div class="chart-wrap"><canvas id="chartLive"></canvas></div>
+    </div>
+    <div class="panel">
+      <h2>Tiempo en cada estado</h2>
+      <div class="state-bars">
+        <div class="state-bar-row"><span class="label">Seguro</span><div class="track"><div class="fill" id="barSeguro" style="width:0%;background:var(--safe)"></div></div><span class="pct" id="pctSeguro">0%</span></div>
+        <div class="state-bar-row"><span class="label">Alerta</span><div class="track"><div class="fill" id="barAlerta" style="width:0%;background:var(--warn)"></div></div><span class="pct" id="pctAlerta">0%</span></div>
+        <div class="state-bar-row"><span class="label">Peligro</span><div class="track"><div class="fill" id="barPeligro" style="width:0%;background:var(--danger)"></div></div><span class="pct" id="pctPeligro">0%</span></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<footer>Prototipo académico — TECSUP · Sistema de alertas de proximidad en entornos mineros</footer>
+
+<script>
+const g = 9.81;
+const REACCION_T = 0.6;
+const WORLD_W = 100, WORLD_H = 40; // metros (mismo sistema que la version Python)
+
+const ZONAS = [
+  { nombre: "RAMPA", x0: 0, x1: 30 },
+  { nombre: "ZONA DE CARGA", x0: 30, x1: 70 },
+  { nombre: "BOTADERO", x0: 70, x1: 100 },
+];
+
+const velEl = document.getElementById("velocidad");
+const masaEl = document.getElementById("masa");
+const terrenoEl = document.getElementById("terreno");
+const numOperariosEl = document.getElementById("numOperarios");
+const margenEl = document.getElementById("margen");
+const lblVel = document.getElementById("lblVel");
+const lblMargen = document.getElementById("lblMargen");
+const statVel = document.getElementById("statVel");
+const statDist = document.getElementById("statDist");
+const statBrake = document.getElementById("statBrake");
+const statFf = document.getElementById("statFf");
+const alertBanner = document.getElementById("alertBanner");
+const btnStart = document.getElementById("btnStart");
+const btnReset = document.getElementById("btnReset");
+const themeToggle = document.getElementById("themeToggle");
+
+function prefersDark() {
+  return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+}
+function isDarkActive() {
+  const attr = document.documentElement.getAttribute("data-theme");
+  if (attr === "dark") return true;
+  if (attr === "light") return false;
+  return prefersDark();
+}
+function updateThemeIcon() {
+  themeToggle.textContent = isDarkActive() ? "☀️" : "🌙";
+}
+themeToggle.addEventListener("click", () => {
+  document.documentElement.setAttribute("data-theme", isDarkActive() ? "light" : "dark");
+  updateThemeIcon();
+  drawScene(lastDrawState.estado, lastDrawState.umbral, lastDrawState.distMin);
+  if (typeof curveChart !== "undefined" && curveChart) {
+    curveChart.data.datasets[0].borderColor = cssVar("--accent");
+    curveChart.data.datasets[0].backgroundColor = hexToRgba(cssVar("--accent"), 0.15);
+    curveChart.update("none");
+  }
+  if (typeof liveChart !== "undefined" && liveChart) {
+    liveChart.data.datasets[0].borderColor = cssVar("--safe");
+    liveChart.data.datasets[1].borderColor = cssVar("--danger");
+    liveChart.update("none");
+  }
+});
+updateThemeIcon();
+
+const canvas = document.getElementById("scene");
+const ctx = canvas.getContext("2d");
+const scaleX = canvas.width / WORLD_W;
+const scaleY = canvas.height / WORLD_H;
+
+let running = false;
+let rafId = null;
+let vehiculo = null;
+let operarios = [];
+let liveTime = [], liveDist = [];
+let simTime = 0;
+let frameCounts = { seguro: 0, alerta: 0, peligro: 0 };
+
+function px(x) { return x * scaleX; }
+function py(y) { return y * scaleY; }
+
+function getParams() {
+  const vKmh = parseFloat(velEl.value);
+  return {
+    vKmh, vMs: vKmh / 3.6,
+    masa: parseFloat(masaEl.value),
+    mu: parseFloat(terrenoEl.value),
+    nOperarios: parseInt(numOperariosEl.value, 10),
+    margen: parseFloat(margenEl.value),
+  };
+}
+
+function distanciaFrenado(vMs, mu, margen) {
+  return ((vMs * vMs) / (2 * mu * g) + vMs * REACCION_T) * margen;
+}
+function fuerzaFriccion(mu, masa) { return mu * masa * g; }
+function fmt(n, d = 2) { return isFinite(n) ? n.toFixed(d) : "—"; }
+
+class Operario {
+  constructor() {
+    this.x = 15 + Math.random() * (WORLD_W - 25);
+    this.y = 6 + Math.random() * (WORLD_H - 12);
+    const ang = Math.random() * Math.PI * 2;
+    const spd = 0.4 + Math.random() * 0.7;
+    this.vx = Math.cos(ang) * spd;
+    this.vy = Math.sin(ang) * spd;
+  }
+  step(dt) {
+    this.x += this.vx * dt; this.y += this.vy * dt;
+    if (this.x < 8 || this.x > WORLD_W - 4) this.vx *= -1;
+    if (this.y < 4 || this.y > WORLD_H - 4) this.vy *= -1;
+    this.x = Math.max(8, Math.min(WORLD_W - 4, this.x));
+    this.y = Math.max(4, Math.min(WORLD_H - 4, this.y));
+  }
+}
+
+class Vehiculo {
+  constructor(vCruceroKmh) {
+    this.x = 2; this.y = WORLD_H / 2;
+    this.vCrucero = vCruceroKmh / 3.6;
+    this.v = this.vCrucero;
+  }
+  step(dt, distMin, mu, margen) {
+    const umbral = distanciaFrenado(this.vCrucero, mu, margen);
+    let estado;
+    if (distMin <= umbral) {
+      this.v = Math.max(0, this.v - mu * g * dt);
+      estado = distMin <= umbral / margen ? "peligro" : "alerta";
+    } else {
+      this.v = Math.min(this.vCrucero, this.v + 1.5 * dt);
+      estado = "seguro";
+    }
+    this.x += this.v * dt;
+    if (this.x > WORLD_W - 4) this.x = 2; // vuelve a recorrer el corredor
+    return { estado, umbral };
+  }
+}
+
+function drawPerson(x, y, color) {
+  ctx.beginPath();
+  ctx.arc(px(x), py(y) - 8, 4.5, 0, Math.PI * 2);
+  ctx.fillStyle = color; ctx.fill();
+  ctx.strokeStyle = "rgba(0,0,0,0.4)"; ctx.lineWidth = 1; ctx.stroke();
+  const rx = px(x) - 3.5, ry = py(y) - 4, rw = 7, rh = 13;
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(rx, ry, rw, rh, 3); else ctx.rect(rx, ry, rw, rh);
+  ctx.fillStyle = color; ctx.fill();
+  ctx.strokeStyle = "rgba(0,0,0,0.4)"; ctx.stroke();
+}
+
+function drawTruck(x, y, color) {
+  const w = 34, h = 18;
+  const bx = px(x) - w / 2, by = py(y) - h / 2;
+  ctx.fillStyle = color; ctx.strokeStyle = "rgba(0,0,0,0.5)"; ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(bx, by, w, h, 4); else ctx.rect(bx, by, w, h);
+  ctx.fill(); ctx.stroke();
+  // cabina
+  ctx.fillStyle = "#2b323c";
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(bx + w - 10, by - 3, 10, h + 3, 3); else ctx.rect(bx + w - 10, by - 3, 10, h + 3);
+  ctx.fill(); ctx.stroke();
+  // ruedas
+  ctx.fillStyle = "#222";
+  [bx + 7, bx + w - 15].forEach(wx => {
+    ctx.beginPath(); ctx.arc(wx, by + h + 2, 3.6, 0, Math.PI * 2); ctx.fill();
+  });
+}
+
+function cssVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+function hexToRgba(hex, alpha) {
+  const m = hex.match(/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i);
+  if (!m) return hex;
+  const r = parseInt(m[1], 16), g = parseInt(m[2], 16), b = parseInt(m[3], 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function getZonaColores() {
+  return isDarkActive()
+    ? ["#9c9284", "#b0a48d", "#8c8272"]
+    : ["#e7e1d4", "#efe9dc", "#ddd5c4"];
+}
+
+let lastDrawState = { estado: "seguro", umbral: 0, distMin: WORLD_W };
+
+function drawScene(estado, umbral, distMin) {
+  lastDrawState = { estado, umbral, distMin };
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+
+  const zonaColores = getZonaColores();
+  ZONAS.forEach((z, i) => {
+    ctx.fillStyle = zonaColores[i];
+    ctx.fillRect(px(z.x0), 0, px(z.x1 - z.x0), h);
+    ctx.fillStyle = isDarkActive() ? "rgba(232,236,241,0.75)" : "rgba(90,100,114,0.75)";
+    ctx.font = "11px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(z.nombre, px((z.x0 + z.x1) / 2), 16);
+  });
+
+  const color = estado === "peligro" ? cssVar("--danger") : estado === "alerta" ? cssVar("--warn") : cssVar("--safe");
+
+  // halo del umbral de frenado
+  ctx.beginPath();
+  ctx.arc(px(vehiculo.x), py(vehiculo.y), umbral * scaleX, 0, Math.PI * 2);
+  ctx.setLineDash([5, 5]);
+  ctx.strokeStyle = color; ctx.globalAlpha = 0.55; ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.setLineDash([]); ctx.globalAlpha = 1;
+
+  operarios.forEach(op => drawPerson(op.x, op.y, "#d7cdb8"));
+  drawTruck(vehiculo.x, vehiculo.y, color);
+}
+
+let curveChart, liveChart;
+
+function buildCurveChart() {
+  const { mu, margen } = getParams();
+  const vs = [], ds = [];
+  for (let v = 5; v <= 45; v += 2) { vs.push(v); ds.push(+distanciaFrenado(v / 3.6, mu, margen).toFixed(2)); }
+  curveChart = new Chart(document.getElementById("chartCurve"), {
+    type: "line",
+    data: { labels: vs, datasets: [{ label: "Umbral de frenado (m)", data: ds, borderColor: cssVar("--accent"), backgroundColor: hexToRgba(cssVar("--accent"), 0.15), pointRadius: 0, tension: 0.25, fill: true }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+      scales: { x: { title: { display: true, text: "Velocidad (km/h)" } }, y: { title: { display: true, text: "Metros" } } } }
+  });
+}
+function updateCurveChart() {
+  const { mu, margen } = getParams();
+  const ds = [];
+  for (let v = 5; v <= 45; v += 2) ds.push(+distanciaFrenado(v / 3.6, mu, margen).toFixed(2));
+  curveChart.data.datasets[0].data = ds;
+  curveChart.update("none");
+}
+function buildLiveChart() {
+  liveChart = new Chart(document.getElementById("chartLive"), {
+    type: "line",
+    data: { labels: [], datasets: [
+      { label: "Distancia mínima (m)", data: [], borderColor: cssVar("--safe"), pointRadius: 0, tension: 0.1 },
+      { label: "Umbral de frenado (m)", data: [], borderColor: cssVar("--danger"), borderDash: [5, 4], pointRadius: 0, tension: 0 },
+    ]},
+    options: { responsive: true, maintainAspectRatio: false, animation: false,
+      plugins: { legend: { labels: { boxWidth: 10, font: { size: 9 } } } },
+      scales: { x: { title: { display: true, text: "Tiempo (s)" }, ticks: { maxTicksLimit: 6 } }, y: { title: { display: true, text: "Metros" } } } }
+  });
+}
+
+function updateStateBars() {
+  const total = frameCounts.seguro + frameCounts.alerta + frameCounts.peligro || 1;
+  const pS = Math.round(100 * frameCounts.seguro / total);
+  const pA = Math.round(100 * frameCounts.alerta / total);
+  const pP = Math.round(100 * frameCounts.peligro / total);
+  document.getElementById("barSeguro").style.width = pS + "%";
+  document.getElementById("barAlerta").style.width = pA + "%";
+  document.getElementById("barPeligro").style.width = pP + "%";
+  document.getElementById("pctSeguro").textContent = pS + "%";
+  document.getElementById("pctAlerta").textContent = pA + "%";
+  document.getElementById("pctPeligro").textContent = pP + "%";
+}
+
+function setupEscena() {
+  const { vKmh, nOperarios } = getParams();
+  vehiculo = new Vehiculo(vKmh);
+  operarios = Array.from({ length: nOperarios }, () => new Operario());
+  simTime = 0; liveTime = []; liveDist = [];
+  frameCounts = { seguro: 0, alerta: 0, peligro: 0 };
+  updateStateBars();
+}
+
+function resetSim() {
+  running = false;
+  cancelAnimationFrame(rafId);
+  setupEscena();
+  liveChart.data.labels = []; liveChart.data.datasets[0].data = []; liveChart.data.datasets[1].data = [];
+  liveChart.update("none");
+  drawScene("seguro", 0, WORLD_W);
+  statVel.textContent = "—"; statDist.textContent = "—"; statBrake.textContent = "—"; statFf.textContent = "—";
+  alertBanner.className = "alert-banner alert-safe";
+  alertBanner.textContent = 'Presiona "Iniciar" para simular';
+  btnStart.textContent = "▶ Iniciar simulación";
+}
+
+function step() {
+  if (!running) return;
+  const dt = 1 / 60;
+  simTime += dt;
+  const { mu, masa, margen } = getParams();
+
+  operarios.forEach(op => op.step(dt));
+  const distancias = operarios.map(op => Math.hypot(vehiculo.x - op.x, vehiculo.y - op.y));
+  const distMin = Math.min(...distancias);
+  const { estado, umbral } = vehiculo.step(dt, distMin, mu, margen);
+  frameCounts[estado]++;
+
+  statVel.textContent = fmt(vehiculo.v * 3.6, 1) + " km/h";
+  statDist.textContent = fmt(distMin, 1) + " m";
+  statBrake.textContent = fmt(umbral, 1) + " m";
+  statFf.textContent = fmt(fuerzaFriccion(mu, masa), 0) + " N";
+
+  const cls = estado === "peligro" ? "alert-danger" : estado === "alerta" ? "alert-warn" : "alert-safe";
+  const txt = estado === "peligro" ? "⚠ COLISIÓN INMINENTE — frenado autónomo activado"
+            : estado === "alerta" ? "⚠ ALERTA DE PROXIMIDAD" : "✔ Distancia segura";
+  alertBanner.className = "alert-banner " + cls;
+  alertBanner.textContent = txt;
+
+  liveTime.push(+simTime.toFixed(2));
+  liveDist.push(+distMin.toFixed(2));
+  if (liveTime.length > 400) { liveTime.shift(); liveDist.shift(); }
+  liveChart.data.labels = liveTime;
+  liveChart.data.datasets[0].data = liveDist;
+  liveChart.data.datasets[1].data = liveTime.map(() => +umbral.toFixed(2));
+  liveChart.update("none");
+
+  updateStateBars();
+  drawScene(estado, umbral, distMin);
+
+  rafId = requestAnimationFrame(step);
+}
+
+btnStart.addEventListener("click", () => {
+  if (running) { running = false; btnStart.textContent = "▶ Continuar"; cancelAnimationFrame(rafId); return; }
+  running = true; btnStart.textContent = "⏸ Pausar";
+  rafId = requestAnimationFrame(step);
+});
+btnReset.addEventListener("click", resetSim);
+
+velEl.addEventListener("input", () => { lblVel.textContent = velEl.value + " km/h"; updateCurveChart(); });
+margenEl.addEventListener("input", () => { lblMargen.textContent = parseFloat(margenEl.value).toFixed(2) + "×"; updateCurveChart(); });
+[masaEl, terrenoEl, numOperariosEl].forEach(el => el.addEventListener("input", () => { updateCurveChart(); if (!running) resetSim(); }));
+
+buildCurveChart();
+buildLiveChart();
+resetSim();
+</script>
+
+</body>
+</html>
